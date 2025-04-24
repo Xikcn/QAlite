@@ -1,6 +1,20 @@
 # QALite
 
-一个轻量级的问答笔记应用，使用Vue 3前端和FastAPI后端。
+#### 作者:XIK
+
+一个轻量级的问答笔记应用，使用Vue 3前端和FastAPI后端，帮助您高效管理和复习知识点。
+用于记录qa式问答，方便复习与记录面试所需要的问题，也可将用户记录上传给大模型，进行模型微调的qa记录软件。
+
+
+## 项目展示
+两种卡片记录方式：
+![be789a5a-e2cd-4468-8164-720bfa13abfc.png](mdimg/be789a5a-e2cd-4468-8164-720bfa13abfc.png)
+![d7e5a64c-c922-4f4b-bbfe-baafa9c40ce4.png](mdimg/d7e5a64c-c922-4f4b-bbfe-baafa9c40ce4.png)
+搜索功能
+![eecf4510-b3fb-42c2-82ec-550c8a54c4dc.png](mdimg/eecf4510-b3fb-42c2-82ec-550c8a54c4dc.png)
+复习功能
+![c0774ffd-013b-475b-8a78-4909082f89a8.png](mdimg/c0774ffd-013b-475b-8a78-4909082f89a8.png)
+
 
 ## 功能特点
 
@@ -13,16 +27,23 @@
 
 ## 快速启动
 
-### 使用启动器
+### 使用Python启动器（推荐）
 
-我们提供了一个便捷的启动器，可以一键启动前后端服务：
+我们提供了一个便捷的Python启动器，可以一键启动前后端服务：
 
-1. 双击 `launcher.bat` 运行启动器
-2. 在启动器界面中，选择以下选项：
-   - 【启动前后端服务】一键启动所有服务
-   - 【仅启动前端】或【仅启动后端】分别启动单个服务
-   - 【打开Markdown文件夹】直接打开存储笔记的文件夹
-3. 服务启动后，浏览器会自动打开前端页面
+1. 运行 `python start.py` 或双击 `start.bat`
+2. 从列表中选择现有的conda环境或手动输入环境名称
+3. 确认后，启动器会自动：
+   - 启动后端服务 (FastAPI)
+   - 启动前端服务 (Vue + Vite)
+   - 自动打开浏览器访问应用
+4. 按 `Ctrl+C` 停止所有服务
+
+启动器的主要优势：
+- 自动检测和使用conda环境
+- 实时显示前后端日志
+- 自动记住上次使用的环境
+- 支持Windows、macOS和Linux
 
 ### 手动启动
 
@@ -32,14 +53,15 @@
 
 1. 进入backend目录
 2. 安装依赖: `pip install -r requirements.txt`
-3. 启动服务: `python main.py`
+3. 启动服务: `python main.py` 或 `uvicorn main:app --reload --host 0.0.0.0 --port 8000`
 4. 后端将在 http://localhost:8000 启动
 
 #### 前端
 
-1. 安装依赖: `npm install`
-2. 启动服务: `npm run dev`
-3. 前端将在 http://localhost:5173 启动
+1. 进入frontend目录
+2. 安装依赖: `npm install`
+3. 启动服务: `npm run dev`
+4. 前端将在 http://localhost:5173 启动
 
 ## 文件存储
 
@@ -47,8 +69,9 @@
 
 ## 系统要求
 
-- Python 3.7+
+- Python 3.8+
 - Node.js 14+
+- Conda环境管理器（使用启动器时）
 - 依赖包：
   - 后端: fastapi, uvicorn, pandas, tabulate
   - 前端: vue3, vite
@@ -70,93 +93,64 @@
 - 显示/隐藏答案：控制答案的可见性
 - 输入你的回答：在输入框中练习回答问题
 
-## 许可证
+## 项目结构
 
-[MIT License](LICENSE)
-
-## 项目介绍
-
-QAlite是一个用于管理QA（问答）格式的Markdown笔记的应用程序。它允许用户创建、编辑和搜索Markdown格式的问答笔记，特别适合整理面试、学习等知识点。
-
-## 技术栈
-
-- 前端：Vue 3 + Vite
-- 后端：Python FastAPI
-
-## 安装与运行
-
-### 前提条件
-
-- Node.js >= 16
-- Python >= 3.8
-
-### 后端安装
-
-```bash
-cd backend
-pip install -r requirements.txt
+```
+QALite/
+├── backend/             # 后端代码
+│   ├── main.py          # 主应用入口
+│   ├── requirements.txt # 后端依赖
+│   └── qa_files/        # 存储Markdown文件的目录
+├── frontend/            # 前端代码
+│   ├── src/             # Vue源代码
+│   ├── package.json     # 前端依赖配置
+│   └── index.html       # 前端入口HTML
+├── start.py             # Python启动器
+├── start.bat            # Windows批处理启动文件
+└── README.md            # 项目说明文档
 ```
 
-### 前端安装
+## Markdown格式
 
-```bash
-npm install
-```
+所有问答对以Markdown表格格式存储：
 
-### 启动后端
-
-```bash
-cd backend
-python run.py
-```
-
-或使用npm脚本：
-
-```bash
-npm run backend
-```
-
-### 启动前端
-
-```bash
-npm run dev
-```
-
-然后在浏览器中访问 http://localhost:5173/
-
-## 使用说明
-
-1. 首次使用时，点击左上角菜单按钮，然后创建一个新的Markdown文件
-2. 在编辑界面中，问题和答案输入框并排显示
-3. 使用鼠标滚轮向上或向下滚动，在问答对之间导航
-4. 向下滚动到最后一个问答对时，自动创建新问答对
-5. 使用右上角的删除按钮删除当前问答对
-6. 点击顶部的搜索图标显示搜索栏，搜索问答内容
-
-## 文件存储
-
-所有Markdown文件将存储在后端的`qa_files`目录中，格式为标准Markdown表格。
-
-## 大模型
+```markdown
 | 问题  | 答案                          |
 |-----|-------------------------------|
 | 什么是防抖？ | 事件停止触发后延迟执行的函数  |
 | 如何判断数组？ | `Array.isArray()` 或 `instanceof` |
+```
 
-## 一键运行便携版
+## 故障排除
 
-无需安装Python和Node.js环境，只需下载便携版即可一键运行：
+### 启动器问题
 
-1. 从[GitHub Releases](https://github.com/你的用户名/QAlite/releases)页面下载最新的`QALite_Portable_Windows.zip`
-2. 解压到任意文件夹
-3. 双击`start.bat`启动应用
-4. 浏览器将自动打开QALite应用页面
+- **找不到conda环境**：确保已安装Conda并添加到环境变量，或手动输入环境名称
+- **重置配置**：删除根目录下的 `qalite_config.json` 文件可重置环境配置
+- **前端启动失败**：手动进入frontend目录运行 `npm install` 安装依赖
 
-便携版特点：
-- 内置所有必要的运行环境和依赖
-- 无需安装任何额外软件（除了浏览器）
-- 适合分享给不熟悉编程的用户
+### 后端问题
 
-### 系统要求（便携版）
-- Windows 10/11
-- 现代浏览器（Chrome、Edge、Firefox等）
+- **依赖错误**：确保所选环境中已安装所需依赖 `pip install -r backend/requirements.txt`
+- **端口占用**：如果8000端口被占用，修改后端代码中的端口配置
+
+### 前端问题
+
+- **页面加载错误**：检查浏览器控制台报错信息
+- **无法连接后端**：确保后端服务已启动并监听正确的端口
+
+## 许可证
+
+[MIT License](LICENSE)
+
+## 贡献
+
+欢迎提交问题报告和改进建议！可以通过以下方式参与项目：
+
+1. Fork项目并创建分支
+2. 提交代码改进
+3. 创建Pull Request
+
+## 致谢
+
+感谢所有为QALite项目做出贡献的开发者！
