@@ -17,7 +17,7 @@
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.2.3",
     "vite": "^4.4.9",
-    "vite-plugin-vue-devtools": "^5.0.0"
+    "vite-plugin-vue-devtools": "^7.7.5"
   },
   "resolutions": {
     "vue": "^3.2.47"

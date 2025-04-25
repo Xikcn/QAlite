@@ -3,3 +3,4 @@ uvicorn
 fastapi
 pydantic
 pathlib
+tabulate
