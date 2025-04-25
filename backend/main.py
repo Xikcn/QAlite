@@ -150,6 +150,11 @@ def parse_markdown_to_qa_pairs(content: str) -> List[QAPair]:
                 answer = row["答案"] if not pd.isna(row["答案"]) else ""
                 user_answer = row["用户回答"] if not pd.isna(row["用户回答"]) else ""
 
+                # 将特殊标记转换回换行符
+                question = question.replace(" [换行] ", "\n") if isinstance(question, str) else ""
+                answer = answer.replace(" [换行] ", "\n") if isinstance(answer, str) else ""
+                user_answer = user_answer.replace(" [换行] ", "\n") if isinstance(user_answer, str) else ""
+
                 # 只添加非空的行
                 if question.strip() or answer.strip():
                     qa_pairs.append(QAPair(
@@ -178,10 +183,16 @@ def generate_markdown_from_qa_pairs(qa_pairs: List[QAPair], prefix: Optional[str
         data["用户回答"] = []
         
     for qa in qa_pairs:
-        data["问题"].append(qa.question)
-        data["答案"].append(qa.answer)
+        # 处理问题和答案中的换行符，将其替换为空格或特殊标记
+        cleaned_question = qa.question.replace("\n", " [换行] ")
+        cleaned_answer = qa.answer.replace("\n", " [换行] ")
+        
+        data["问题"].append(cleaned_question)
+        data["答案"].append(cleaned_answer)
         if has_user_answers:
-            data["用户回答"].append(qa.userAnswer or "")
+            user_answer = qa.userAnswer or ""
+            cleaned_user_answer = user_answer.replace("\n", " [换行] ")
+            data["用户回答"].append(cleaned_user_answer)
 
     df = pd.DataFrame(data)
 
