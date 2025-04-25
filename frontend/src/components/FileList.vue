@@ -102,7 +102,7 @@ function handleDeleteFile(event, filename) {
   padding: 12px 16px;
   border-bottom: 1px solid var(--bg-tertiary);
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.3s ease;
   position: relative;
 }
 
@@ -111,11 +111,15 @@ function handleDeleteFile(event, filename) {
 }
 
 .ios-file-item.active {
-  background-color: rgba(0, 122, 255, 0.1);
+  background-color: rgba(0, 122, 255, 0.15);
+  transform: scale(1.02);
+  box-shadow: 0 2px 10px rgba(0, 122, 255, 0.2);
+  border-left: 4px solid var(--accent-color);
 }
 
 .dark-mode .ios-file-item.active {
-  background-color: rgba(10, 132, 255, 0.2);
+  background-color: rgba(10, 132, 255, 0.25);
+  box-shadow: 0 2px 10px rgba(10, 132, 255, 0.3);
 }
 
 .ios-file-item:active {
@@ -132,6 +136,11 @@ function handleDeleteFile(event, filename) {
   font-size: 20px;
 }
 
+.ios-file-item.active .ios-file-icon {
+  transform: scale(1.1);
+  animation: pulse 2s infinite;
+}
+
 .ios-file-details {
   flex: 1;
   min-width: 0;
@@ -146,6 +155,11 @@ function handleDeleteFile(event, filename) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.ios-file-item.active .ios-file-name {
+  font-weight: 600;
+  color: var(--accent-color);
 }
 
 .ios-file-time {
@@ -169,5 +183,17 @@ function handleDeleteFile(event, filename) {
 .ios-file-action:active {
   opacity: 1;
   transform: scale(0.92);
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 </style> 

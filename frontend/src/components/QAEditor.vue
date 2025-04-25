@@ -325,10 +325,10 @@ function navigateTo(index) {
     currentIndex.value = index;
     saveSettings();
     
-    // 动画完成后重置状态
+    // 动画完成后重置状态，减少动画时间
     setTimeout(() => {
       isAnimating.value = false;
-    }, 400);
+    }, 300); // 从400ms减少到300ms
   }
 }
 
@@ -484,6 +484,47 @@ const handleBeforeUnload = () => {
   }
 };
 
+// 导出方法供外部组件调用
+// 直接跳转到指定索引的问答卡片
+function navigateToIndex(index, smooth = true) {
+  // 确保索引有效
+  if (index >= 0 && index < localQaPairs.value.length) {
+    // 如果有未保存的更改，先保存
+    if (hasUnsavedChanges.value) {
+      saveChanges();
+    }
+    
+    // 设置新索引
+    currentIndex.value = index;
+    saveSettings();
+    
+    // 高亮显示当前卡片，使用较短的延迟
+    setTimeout(() => {
+      const currentCard = document.querySelector('.qa-card.current');
+      if (currentCard) {
+        currentCard.classList.add('highlight-card');
+        currentCard.scrollIntoView({ 
+          behavior: smooth ? 'smooth' : 'auto', 
+          block: 'center' 
+        });
+        
+        // 高亮效果持续2秒
+        setTimeout(() => {
+          currentCard.classList.remove('highlight-card');
+        }, 2000);
+      }
+    }, 50); // 将延迟从100ms减少到50ms
+    
+    return true;
+  }
+  return false;
+}
+
+// 暴露方法供父组件调用
+defineExpose({
+  navigateToIndex
+});
+
 // 挂载事件监听器
 onMounted(() => {
   // 加载存储的设置
@@ -491,6 +532,15 @@ onMounted(() => {
   
   // 添加页面卸载前保存
   window.addEventListener('beforeunload', handleBeforeUnload);
+  
+  // 添加自定义事件监听，允许外部跳转到特定索引
+  window.addEventListener('qalite-navigate', (event) => {
+    if (event.detail && typeof event.detail.index === 'number') {
+      console.log("QAEditor收到跳转事件:", event.detail.index);
+      const smooth = event.detail.smooth !== undefined ? event.detail.smooth : true;
+      navigateToIndex(event.detail.index, smooth);
+    }
+  });
   
   if (editorContainer.value) {
     // 使用函数包装器以确保在正确的上下文中处理事件
@@ -526,6 +576,9 @@ onMounted(() => {
 onUnmounted(() => {
   // 移除页面卸载前保存
   window.removeEventListener('beforeunload', handleBeforeUnload);
+  
+  // 移除自定义事件监听
+  window.removeEventListener('qalite-navigate', navigateToIndex);
   
   if (editorContainer.value) {
     // 由于我们使用了函数包装器，这里的移除可能不会工作，但Vue会在组件卸载时自动清理DOM
@@ -667,7 +720,7 @@ const currentRevisionQA = computed(() => {
 </script>
 
 <template>
-  <div class="cute-qa-editor" ref="editorContainer">
+  <div class="qa-editor" ref="editorContainer">
     <div class="editor-header">
       <div class="editor-title">Q&A 编辑器</div>
       <div class="editor-actions">
@@ -854,7 +907,7 @@ const currentRevisionQA = computed(() => {
 </template>
 
 <style scoped>
-.cute-qa-editor {
+.qa-editor {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -1252,17 +1305,17 @@ textarea:disabled {
 /* 卡片切换动画 */
 .card-enter-active,
 .card-leave-active {
-  transition: all 0.4s ease;
+  transition: all 0.3s ease; /* 从0.4s改为0.3s */
 }
 
 .card-enter-from {
   opacity: 0;
-  transform: translateY(50px);
+  transform: translateY(30px); /* 从50px改为30px，减少移动距离 */
 }
 
 .card-leave-to {
   opacity: 0;
-  transform: translateY(-50px);
+  transform: translateY(-30px); /* 从50px改为30px，减少移动距离 */
 }
 
 /* 响应式设计 */

@@ -318,6 +318,137 @@ onMounted(() => {
     document.documentElement.classList.add('dark-mode');
   }
 });
+
+// 处理搜索结果点击
+async function handleSearchResultClick(result) {
+  console.log("点击搜索结果:", result);
+  
+  // 如果结果中的文件与当前文件不同，先加载该文件
+  if (!currentFile.value || currentFile.value.filename !== result.filename) {
+    console.log("加载文件:", result.filename);
+    await fetchFile(result.filename);
+  }
+  
+  // 关闭搜索结果面板
+  showSearch.value = false;
+  
+  // 减少延迟时间，加快响应速度
+  setTimeout(() => {
+    console.log("开始查找匹配卡片");
+    
+    // 找到问题和答案在qa_pairs中的索引
+    const qaIndex = currentFile.value.qa_pairs.findIndex(qa => 
+      qa.question.includes(result.question) && qa.answer.includes(result.answer)
+    );
+    
+    console.log("匹配的问答对索引:", qaIndex);
+    
+    if (qaIndex !== -1) {
+      // 减少等待时间
+      setTimeout(() => {
+        // 方法1：通过Vue组件实例调用方法
+        try {
+          const editorElement = document.querySelector('.qa-editor');
+          if (editorElement && editorElement.__vnode && editorElement.__vnode.component) {
+            console.log("找到QAEditor组件");
+            const editorComponent = editorElement.__vnode.component.exposed;
+            if (editorComponent && typeof editorComponent.navigateToIndex === 'function') {
+              console.log("调用navigateToIndex方法");
+              editorComponent.navigateToIndex(qaIndex, false); // 传入false参数，表示不使用平滑滚动
+              return;
+            }
+          }
+        } catch (e) {
+          console.error("通过组件实例调用失败:", e);
+        }
+        
+        console.log("尝试使用DOM方法");
+        
+        // 方法2：通过事件触发
+        try {
+          // 尝试通过事件触发跳转
+          window.dispatchEvent(new CustomEvent('qalite-navigate', { 
+            detail: { index: qaIndex, smooth: false } 
+          }));
+          return;
+        } catch (e) {
+          console.error("通过事件触发失败:", e);
+        }
+        
+        // 方法3：最后尝试直接操作DOM
+        try {
+          const qaCards = document.querySelectorAll('.qa-card');
+          console.log("找到卡片数量:", qaCards.length);
+          
+          if (qaIndex < qaCards.length) {
+            const targetCard = qaCards[qaIndex];
+            console.log("找到目标卡片:", targetCard);
+            
+            if (targetCard) {
+              // 高亮显示并立即滚动到视图中(不使用平滑滚动)
+              targetCard.classList.add('highlight-card');
+              targetCard.scrollIntoView({ behavior: 'auto', block: 'center' });
+              
+              // 高亮显示3秒后移除
+              setTimeout(() => {
+                targetCard.classList.remove('highlight-card');
+              }, 3000);
+            }
+          } else {
+            console.log("卡片索引超出范围");
+          }
+        } catch (e) {
+          console.error("通过DOM操作失败:", e);
+        }
+      }, 100); // 将300ms减少到100ms
+    } else {
+      console.log("在当前文件中未找到精确匹配的问答对，尝试文本匹配");
+      
+      // 使用文本匹配作为后备方案，减少延迟
+      setTimeout(() => {
+        try {
+          const qaCards = document.querySelectorAll('.qa-card');
+          console.log("文本匹配模式找到卡片数量:", qaCards.length);
+          
+          let found = false;
+          
+          for (let i = 0; i < qaCards.length; i++) {
+            const questionEl = qaCards[i].querySelector('.qa-question-content');
+            const answerEl = qaCards[i].querySelector('.qa-answer-content');
+            
+            if (!questionEl || !answerEl) continue;
+            
+            const questionText = questionEl.textContent || '';
+            const answerText = answerEl.textContent || '';
+            
+            if (questionText.includes(result.question) && 
+                answerText.includes(result.answer)) {
+              console.log("通过文本内容找到匹配卡片:", i);
+              
+              // 找到匹配的卡片，高亮显示并立即滚动到视图中
+              qaCards[i].classList.add('highlight-card');
+              qaCards[i].scrollIntoView({ behavior: 'auto', block: 'center' });
+              
+              // 高亮显示3秒后移除
+              setTimeout(() => {
+                qaCards[i].classList.remove('highlight-card');
+              }, 3000);
+              
+              found = true;
+              break;
+            }
+          }
+          
+          if (!found) {
+            console.log("无法找到匹配的卡片");
+          }
+        } catch (e) {
+          console.error("文本匹配失败:", e);
+        }
+      }, 200); // 将500ms减少到200ms
+    }
+  }, 100); // 将300ms减少到100ms
+}
 </script>
 
 <template>
@@ -441,6 +572,7 @@ onMounted(() => {
                 :whileInView="{ opacity: 1, x: 0 }"
                 :transition="{ delay: index * 0.05 }"
                 class="result-item"
+                @click="() => handleSearchResultClick(result)"
               >
                 <div class="result-filename">{{ result.filename }}</div>
                 <div class="result-question">{{ result.question }}</div>
@@ -693,6 +825,33 @@ body {
   transform: scale(1.05);
 }
 
+.file-card-wrapper.active .stacked-file-card {
+  background-color: rgba(0, 122, 255, 0.1);
+  border: 2px solid var(--accent-color);
+  box-shadow: 0 6px 16px rgba(0, 122, 255, 0.2);
+}
+
+.dark-mode .file-card-wrapper.active .stacked-file-card {
+  background-color: rgba(10, 132, 255, 0.15);
+  box-shadow: 0 6px 16px rgba(10, 132, 255, 0.3);
+}
+
+.file-card-wrapper.active .file-name {
+  color: var(--accent-color);
+  font-weight: 700;
+}
+
+.file-card-wrapper.active::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: 0;
+  height: 100%;
+  width: 4px;
+  background-color: var(--accent-color);
+  border-radius: 2px;
+}
+
 .stacked-file-card {
   background-color: var(--bg-secondary);
   border-radius: 12px;
@@ -889,6 +1048,35 @@ body {
 .result-item {
   padding: 16px;
   border-bottom: 1px solid var(--bg-tertiary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.result-item:hover {
+  background-color: rgba(0, 122, 255, 0.05);
+  transform: translateX(5px);
+}
+
+.result-item:active {
+  background-color: rgba(0, 122, 255, 0.1);
+  transform: translateX(3px);
+}
+
+.result-item::after {
+  content: '↗';
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--accent-color);
+  font-size: 14px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.result-item:hover::after {
+  opacity: 1;
 }
 
 .result-filename {
@@ -916,6 +1104,32 @@ body {
   
   .ios-main {
     width: calc(100% - 200px);
+  }
+}
+
+/* 搜索结果高亮卡片样式 */
+.highlight-card {
+  animation: highlight-pulse 2s ease;
+  border: 2px solid var(--accent-color) !important;
+  box-shadow: 0 0 15px rgba(0, 122, 255, 0.4) !important;
+  transform: scale(1.02);
+  z-index: 10;
+  position: relative;
+}
+
+.dark-mode .highlight-card {
+  box-shadow: 0 0 15px rgba(10, 132, 255, 0.5) !important;
+}
+
+@keyframes highlight-pulse {
+  0% {
+    box-shadow: 0 0 5px rgba(0, 122, 255, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(0, 122, 255, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 5px rgba(0, 122, 255, 0.2);
   }
 }
 
