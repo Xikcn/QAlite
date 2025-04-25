@@ -100,6 +100,16 @@ async function createFile(fileData) {
 async function updateFile(qaData) {
   if (!currentFile.value) return;
   
+  // 检查数据是否真正变化
+  const currentQAString = JSON.stringify(currentFile.value.qa_pairs || []);
+  const newQAString = JSON.stringify(qaData || []);
+  
+  // 只有当数据真正变化时才发送更新请求
+  if (currentQAString === newQAString) {
+    console.log("数据未变化，跳过更新请求");
+    return;
+  }
+  
   loading.value = true;
   try {
     const response = await fetch(`${API_URL}/files/${currentFile.value.filename}`, {

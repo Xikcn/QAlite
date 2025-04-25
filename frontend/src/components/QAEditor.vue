@@ -103,6 +103,9 @@ const currentQA = computed(() => {
 
 // 添加新的问答对
 async function addNewQA() {
+  // 保存当前输入框的引用
+  const activeElement = document.activeElement;
+  
   // 保存当前内容
   await saveChanges();
   
@@ -127,6 +130,15 @@ async function addNewQA() {
       setTimeout(() => {
         currentIndex.value = localQaPairs.value.length;
         saveSettings();
+        
+        // 在下一个渲染循环中尝试聚焦新创建的问题输入框
+        setTimeout(() => {
+          const questionInputs = document.querySelectorAll('.question-card textarea');
+          if (questionInputs.length > 0) {
+            const lastInput = questionInputs[questionInputs.length - 1];
+            lastInput.focus();
+          }
+        }, 50);
       }, 100);
       return;
     } else {
@@ -144,17 +156,38 @@ async function addNewQA() {
   saveSettings();
   await updateParent();
   console.log("本地添加完成，当前索引:", currentIndex.value);
+  
+  // 聚焦到新的输入框
+  setTimeout(() => {
+    const questionInputs = document.querySelectorAll('.question-card textarea');
+    if (questionInputs.length > 0) {
+      const lastInput = questionInputs[questionInputs.length - 1];
+      lastInput.focus();
+    }
+  }, 50);
 }
 
 // 删除当前问答对
 async function deleteCurrentQA() {
   const index = currentIndex.value;
   
+  // 保存当前输入框的引用
+  const activeElement = document.activeElement;
+  
   if (localQaPairs.value.length <= 1) {
     // 如果只有一个问答对，清空它而不是删除
     localQaPairs.value = [{ question: '', answer: '' }];
     currentIndex.value = 0;
     updateParent();
+    
+    // 聚焦到清空后的输入框
+    setTimeout(() => {
+      const questionInput = document.querySelector('.question-card textarea');
+      if (questionInput) {
+        questionInput.focus();
+      }
+    }, 50);
+    
     return;
   }
   
@@ -165,6 +198,15 @@ async function deleteCurrentQA() {
       // API成功，调整currentIndex
       currentIndex.value = Math.min(currentIndex.value, localQaPairs.value.length - 2);
       saveSettings();
+      
+      // 聚焦到当前显示的问答对
+      setTimeout(() => {
+        const currentQuestionInput = document.querySelector('.current .question-card textarea');
+        if (currentQuestionInput) {
+          currentQuestionInput.focus();
+        }
+      }, 50);
+      
       return;
     }
   }
@@ -175,6 +217,14 @@ async function deleteCurrentQA() {
   saveSettings();
   updateParent();
   hasUnsavedChanges.value = false;
+  
+  // 聚焦到当前显示的问答对
+  setTimeout(() => {
+    const currentQuestionInput = document.querySelector('.current .question-card textarea');
+    if (currentQuestionInput) {
+      currentQuestionInput.focus();
+    }
+  }, 50);
 }
 
 // 更新父组件数据
@@ -192,8 +242,15 @@ function updateParent() {
     filteredQaPairs.push({ question: '', answer: '' });
   }
   
+  // 检查数据是否真正发生变化
+  const currentQaPairsJson = JSON.stringify(props.qaPairs);
+  const newQaPairsJson = JSON.stringify(filteredQaPairs);
+  
+  // 只有当数据真正变化时才触发更新
+  if (currentQaPairsJson !== newQaPairsJson) {
   // 发送更新到父组件
   emit('update', filteredQaPairs);
+  }
   
   // 如果过滤后的数组长度发生变化，可能需要调整当前索引
   if (filteredQaPairs.length !== localQaPairs.value.length) {
@@ -205,7 +262,7 @@ function updateParent() {
 }
 
 // 处理输入变化
-function handleInput() {
+function handleInput(event) {
   // 标记为有未保存的更改
   hasUnsavedChanges.value = true;
   
@@ -216,7 +273,21 @@ function handleInput() {
   
   // 设置新的定时器，2秒后自动保存
   autoSaveTimer = setTimeout(() => {
-    saveChanges();
+    // 保存当前输入框的引用和光标位置
+    const activeElement = document.activeElement;
+    const selectionStart = activeElement ? activeElement.selectionStart : null;
+    const selectionEnd = activeElement ? activeElement.selectionEnd : null;
+    
+    saveChanges().then(() => {
+      // 保存后恢复光标位置
+      if (activeElement && typeof selectionStart === 'number' && typeof selectionEnd === 'number') {
+        setTimeout(() => {
+          activeElement.focus();
+          activeElement.selectionStart = selectionStart;
+          activeElement.selectionEnd = selectionEnd;
+        }, 10);
+      }
+    });
   }, 2000);
   
   // 自动调整文本区域高度
@@ -228,6 +299,11 @@ function handleInput() {
 // 立即保存更改
 async function saveChanges() {
   if (hasUnsavedChanges.value) {
+    // 保存当前输入框的引用和光标位置
+    const activeElement = document.activeElement;
+    const selectionStart = activeElement ? activeElement.selectionStart : null;
+    const selectionEnd = activeElement ? activeElement.selectionEnd : null;
+    
     updateParent();
     hasUnsavedChanges.value = false;
     if (autoSaveTimer) {
@@ -235,6 +311,15 @@ async function saveChanges() {
       autoSaveTimer = null;
     }
     saveSettings();
+    
+    // 恢复光标位置
+    if (activeElement && typeof selectionStart === 'number' && typeof selectionEnd === 'number') {
+      setTimeout(() => {
+        activeElement.focus();
+        activeElement.selectionStart = selectionStart;
+        activeElement.selectionEnd = selectionEnd;
+      }, 10);
+    }
   }
 }
 
@@ -283,6 +368,11 @@ function navigateTo(index) {
 
 // 导航到相对位置
 async function navigateRelative(direction) {
+  // 保存当前输入框的引用和光标位置
+  const activeElement = document.activeElement;
+  const selectionStart = activeElement ? activeElement.selectionStart : null;
+  const selectionEnd = activeElement ? activeElement.selectionEnd : null;
+  
   // 首先保存当前内容
   await saveChanges();
   
@@ -299,12 +389,25 @@ async function navigateRelative(direction) {
       await addNewQA(); // 使用优化后的addNewQA函数
     }
   }
+  
+  // 等待视图更新后，尝试聚焦到合适的输入框
+  setTimeout(() => {
+    const newQuestionInput = document.querySelector('.current .question-card textarea');
+    if (newQuestionInput) {
+      newQuestionInput.focus();
+    }
+  }, 50);
 }
 
 // 处理鼠标滚轮事件
 async function handleWheel(event) {
   // 阻止默认行为，避免页面滚动
   event.preventDefault();
+  
+  // 保存当前输入框的引用和光标位置
+  const activeElement = document.activeElement;
+  const selectionStart = activeElement ? activeElement.selectionStart : null;
+  const selectionEnd = activeElement ? activeElement.selectionEnd : null;
 
   // 如果有未保存的更改，先保存
   if (hasUnsavedChanges.value) {
@@ -324,18 +427,31 @@ async function handleWheel(event) {
     } else {
       // 不是最后一张卡片，正常导航到下一张
       navigateTo(currentIndex.value + 1);
+      
+      // 等待视图更新后，尝试聚焦到合适的输入框
+      setTimeout(() => {
+        const newQuestionInput = document.querySelector('.current .question-card textarea');
+        if (newQuestionInput) {
+          newQuestionInput.focus();
+        }
+      }, 50);
     }
   } else if (event.deltaY < 0) {
     // 向上滚动，检查是否是第一张卡片
     if (currentIndex.value > 0) {
       // 不是第一张卡片，可以导航到上一张
       navigateTo(currentIndex.value - 1);
+      
+      // 等待视图更新后，尝试聚焦到合适的输入框
+      setTimeout(() => {
+        const newQuestionInput = document.querySelector('.current .question-card textarea');
+        if (newQuestionInput) {
+          newQuestionInput.focus();
+        }
+      }, 50);
     }
     // 如果已经是第一张卡片，不做任何操作，防止循环
   }
-  
-  // 不改变视图模式，保持当前视图状态
-  // 移除任何可能导致视图切换的代码
 }
 
 // 处理触摸事件

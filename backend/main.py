@@ -13,7 +13,7 @@ app = FastAPI(title="QAlite API")
 # 配置CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 允许所有来源，实际部署时应限制
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],  # 明确指定前端域名
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
