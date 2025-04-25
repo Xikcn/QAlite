@@ -7,15 +7,22 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "backend": "cd backend && python run.py"
+    "backend": "cd backend && python run.py",
+    "compat-install": "npm ci --legacy-peer-deps"
   },
   "dependencies": {
     "motion-v": "^1.0.0-beta.2",
-    "vue": "^3.5.13"
+    "vue": "^3.2.47"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^5.2.3",
-    "vite": "^6.3.3",
-    "vite-plugin-vue-devtools": "^7.7.2"
+    "@vitejs/plugin-vue": "^4.2.3",
+    "vite": "^4.4.9",
+    "vite-plugin-vue-devtools": "^5.0.0"
+  },
+  "resolutions": {
+    "vue": "^3.2.47"
+  },
+  "engines": {
+    "node": ">=12.0.0"
   }
 }

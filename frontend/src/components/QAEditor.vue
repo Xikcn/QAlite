@@ -103,20 +103,19 @@ const currentQA = computed(() => {
 
 // 添加新的问答对
 async function addNewQA() {
-  // 保存当前输入框的引用
-  const activeElement = document.activeElement;
-  
-  // 保存当前内容
-  await saveChanges();
-  
-  console.log("开始添加新的QA对");
-  
   // 验证当前问答对至少一个不为空
   const current = currentQA.value;
   if (!current.question.trim() && !current.answer.trim()) {
     console.log("当前问答对为空，不添加新问答对");
     return; // 不允许添加新的空问答对
   }
+  
+  // 保存当前内容
+  if (hasUnsavedChanges.value) {
+    await saveChanges();
+  }
+  
+  console.log("开始添加新的QA对");
   
   // 使用单个QA添加API（如果可用）
   if (props.addSingleQA) {
@@ -126,20 +125,17 @@ async function addNewQA() {
     if (success) {
       console.log("API添加成功，更新索引");
       // API成功，导航到最后一个QA对（新添加的）
-      // 这里故意延迟100ms，确保数据已经更新
+      currentIndex.value = localQaPairs.value.length;
+      saveSettings();
+      
+      // 在下一个渲染循环中尝试聚焦新创建的问题输入框
       setTimeout(() => {
-        currentIndex.value = localQaPairs.value.length;
-        saveSettings();
-        
-        // 在下一个渲染循环中尝试聚焦新创建的问题输入框
-        setTimeout(() => {
-          const questionInputs = document.querySelectorAll('.question-card textarea');
-          if (questionInputs.length > 0) {
-            const lastInput = questionInputs[questionInputs.length - 1];
-            lastInput.focus();
-          }
-        }, 50);
-      }, 100);
+        const questionInputs = document.querySelectorAll('.question-card textarea');
+        if (questionInputs.length > 0) {
+          const lastInput = questionInputs[questionInputs.length - 1];
+          lastInput.focus();
+        }
+      }, 50);
       return;
     } else {
       console.log("API添加失败，使用本地添加");
@@ -171,11 +167,8 @@ async function addNewQA() {
 async function deleteCurrentQA() {
   const index = currentIndex.value;
   
-  // 保存当前输入框的引用
-  const activeElement = document.activeElement;
-  
+  // 如果只有一个问答对，清空它而不是删除
   if (localQaPairs.value.length <= 1) {
-    // 如果只有一个问答对，清空它而不是删除
     localQaPairs.value = [{ question: '', answer: '' }];
     currentIndex.value = 0;
     updateParent();
@@ -266,29 +259,13 @@ function handleInput(event) {
   // 标记为有未保存的更改
   hasUnsavedChanges.value = true;
   
-  // 清除之前的定时器
+  // 清除之前的定时器 - 不再需要
   if (autoSaveTimer) {
     clearTimeout(autoSaveTimer);
+    autoSaveTimer = null;
   }
   
-  // 设置新的定时器，2秒后自动保存
-  autoSaveTimer = setTimeout(() => {
-    // 保存当前输入框的引用和光标位置
-    const activeElement = document.activeElement;
-    const selectionStart = activeElement ? activeElement.selectionStart : null;
-    const selectionEnd = activeElement ? activeElement.selectionEnd : null;
-    
-    saveChanges().then(() => {
-      // 保存后恢复光标位置
-      if (activeElement && typeof selectionStart === 'number' && typeof selectionEnd === 'number') {
-        setTimeout(() => {
-          activeElement.focus();
-          activeElement.selectionStart = selectionStart;
-          activeElement.selectionEnd = selectionEnd;
-        }, 10);
-      }
-    });
-  }, 2000);
+  // 不再设置自动保存定时器，只标记变更状态
   
   // 自动调整文本区域高度
   if (event && event.target) {
@@ -299,11 +276,7 @@ function handleInput(event) {
 // 立即保存更改
 async function saveChanges() {
   if (hasUnsavedChanges.value) {
-    // 保存当前输入框的引用和光标位置
-    const activeElement = document.activeElement;
-    const selectionStart = activeElement ? activeElement.selectionStart : null;
-    const selectionEnd = activeElement ? activeElement.selectionEnd : null;
-    
+    // 简化保存逻辑，避免不必要的DOM操作
     updateParent();
     hasUnsavedChanges.value = false;
     if (autoSaveTimer) {
@@ -311,15 +284,6 @@ async function saveChanges() {
       autoSaveTimer = null;
     }
     saveSettings();
-    
-    // 恢复光标位置
-    if (activeElement && typeof selectionStart === 'number' && typeof selectionEnd === 'number') {
-      setTimeout(() => {
-        activeElement.focus();
-        activeElement.selectionStart = selectionStart;
-        activeElement.selectionEnd = selectionEnd;
-      }, 10);
-    }
   }
 }
 
@@ -353,7 +317,9 @@ function navigateTo(index) {
   
   if (index >= 0 && index < localQaPairs.value.length && index !== currentIndex.value) {
     // 保存当前卡片的内容
-    saveChanges();
+    if (hasUnsavedChanges.value) {
+      saveChanges();
+    }
     
     isAnimating.value = true;
     currentIndex.value = index;
@@ -368,13 +334,10 @@ function navigateTo(index) {
 
 // 导航到相对位置
 async function navigateRelative(direction) {
-  // 保存当前输入框的引用和光标位置
-  const activeElement = document.activeElement;
-  const selectionStart = activeElement ? activeElement.selectionStart : null;
-  const selectionEnd = activeElement ? activeElement.selectionEnd : null;
-  
   // 首先保存当前内容
-  await saveChanges();
+  if (hasUnsavedChanges.value) {
+    await saveChanges();
+  }
   
   if (direction === 'prev' && currentIndex.value > 0) {
     navigateTo(currentIndex.value - 1);
@@ -404,11 +367,9 @@ async function handleWheel(event) {
   // 阻止默认行为，避免页面滚动
   event.preventDefault();
   
-  // 保存当前输入框的引用和光标位置
-  const activeElement = document.activeElement;
-  const selectionStart = activeElement ? activeElement.selectionStart : null;
-  const selectionEnd = activeElement ? activeElement.selectionEnd : null;
-
+  // 如果正在动画中，不进行处理
+  if (isAnimating.value) return;
+  
   // 如果有未保存的更改，先保存
   if (hasUnsavedChanges.value) {
     await saveChanges();
@@ -474,40 +435,62 @@ async function handleTouchEnd(event) {
   
   // 检测是否为有效的滑动（大于30像素）
   if (Math.abs(diffY) > 30) {
-    // 保存当前内容
-    await saveChanges();
+    // 只在有未保存的内容时保存
+    if (hasUnsavedChanges.value) {
+      await saveChanges();
+    }
     
     if (diffY > 0) {
       // 向上滑动，显示下一个
       // 如果是最后一个卡片且有内容，创建新卡片
       if (currentIndex.value === localQaPairs.value.length - 1) {
-        console.log("触摸触底，尝试创建新卡片");
         const current = currentQA.value;
         if (current.question.trim() || current.answer.trim()) {
-          console.log("当前卡片有内容，创建新卡片");
-          await addNewQA(); // 使用优化后的addNewQA函数
+          await addNewQA();
         }
-        return; // 防止继续处理
       } else if (currentIndex.value < localQaPairs.value.length - 1) {
         // 只在不是最后一个卡片时导航到下一个
         navigateTo(currentIndex.value + 1);
+        
+        // 等待视图更新后，尝试聚焦到合适的输入框
+        setTimeout(() => {
+          const newQuestionInput = document.querySelector('.current .question-card textarea');
+          if (newQuestionInput) {
+            newQuestionInput.focus();
+          }
+        }, 50);
       }
     } else if (diffY < 0) {
       // 向下滑动，显示上一个，只在不是第一个卡片时
       if (currentIndex.value > 0) {
         navigateTo(currentIndex.value - 1);
+        
+        // 等待视图更新后，尝试聚焦到合适的输入框
+        setTimeout(() => {
+          const newQuestionInput = document.querySelector('.current .question-card textarea');
+          if (newQuestionInput) {
+            newQuestionInput.focus();
+          }
+        }, 50);
       }
     }
   }
 }
 
-// 确保离开页面前保存内容
-window.addEventListener('beforeunload', saveChanges);
+// 定义beforeunload处理函数
+const handleBeforeUnload = () => {
+  if (hasUnsavedChanges.value) {
+    saveChanges();
+  }
+};
 
 // 挂载事件监听器
 onMounted(() => {
   // 加载存储的设置
   loadSettings();
+  
+  // 添加页面卸载前保存
+  window.addEventListener('beforeunload', handleBeforeUnload);
   
   if (editorContainer.value) {
     // 使用函数包装器以确保在正确的上下文中处理事件
@@ -541,6 +524,9 @@ onMounted(() => {
 
 // 卸载事件监听器
 onUnmounted(() => {
+  // 移除页面卸载前保存
+  window.removeEventListener('beforeunload', handleBeforeUnload);
+  
   if (editorContainer.value) {
     // 由于我们使用了函数包装器，这里的移除可能不会工作，但Vue会在组件卸载时自动清理DOM
     editorContainer.value.removeEventListener('wheel', handleWheel);
@@ -548,7 +534,6 @@ onUnmounted(() => {
     editorContainer.value.removeEventListener('touchmove', handleTouchMove);
     editorContainer.value.removeEventListener('touchend', handleTouchEnd);
   }
-  window.removeEventListener('beforeunload', saveChanges);
   
   // 确保清除定时器
   if (autoSaveTimer) {
@@ -774,6 +759,7 @@ const currentRevisionQA = computed(() => {
           <div class="card question-card">
             <div class="card-header">
               <span class="card-label">问题 <span class="card-emoji">❓</span></span>
+              <span v-if="hasUnsavedChanges" class="unsaved-indicator">未保存</span>
             </div>
             <div class="card-content">
               <textarea v-model="qa.question" placeholder="输入你的问题..." 
@@ -846,9 +832,10 @@ const currentRevisionQA = computed(() => {
         <span class="button-text">新建</span>
         <span class="button-emoji">✨</span>
       </button>
-      <button class="nav-button save-button" @click="saveChanges" :disabled="!hasUnsavedChanges">
+      <button class="nav-button save-button" @click="saveChanges" :disabled="!hasUnsavedChanges" 
+        :class="{'highlight-save': hasUnsavedChanges}">
         <span class="button-text">保存</span>
-        <span class="button-emoji">💾</span>
+        <span class="button-emoji">{{ hasUnsavedChanges ? '📝' : '💾' }}</span>
       </button>
       <button class="nav-button delete-button" @click="deleteCurrentQA" :disabled="localQaPairs.length <= 1">
         <span class="button-text">删除</span>
@@ -1151,9 +1138,27 @@ textarea:disabled {
   color: #b91c1c;
 }
 
-.save-button {
+.nav-button.save-button {
   background: #e0f2fe;
   color: #0369a1;
+}
+
+.nav-button.save-button.highlight-save {
+  background: #93c5fd;
+  animation: pulse 1.5s infinite;
+  font-weight: bold;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(147, 197, 253, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 5px rgba(147, 197, 253, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(147, 197, 253, 0);
+  }
 }
 
 .save-button:disabled {
@@ -1548,5 +1553,24 @@ textarea:disabled {
 
 :global(.dark-mode) .toggle-answer:hover:not(:disabled) {
   background: #1e5c90;
+}
+
+.unsaved-indicator {
+  font-size: 0.8rem;
+  color: #ef4444;
+  font-weight: 600;
+  background-color: rgba(239, 68, 68, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  animation: fadeInOut 2s infinite;
+}
+
+@keyframes fadeInOut {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 </style> 

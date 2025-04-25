@@ -76,17 +76,39 @@ def check_node_environment():
             node_version = node_result.stdout.strip()
             npm_version = npm_result.stdout.strip()
             print(f"检测到Node.js环境: {node_version}, npm: {npm_version}")
-            return True, node_version, npm_version
+            
+            # 检查Node.js版本是否满足最低要求（15.0.0或更高）
+            # 版本格式通常为vX.Y.Z，需要去掉v前缀
+            if node_version.startswith('v'):
+                node_version_str = node_version[1:]
+            else:
+                node_version_str = node_version
+                
+            try:
+                # 解析版本号
+                version_parts = node_version_str.split('.')
+                major_version = int(version_parts[0])
+                
+                # 检查主版本号是否至少为15
+                if major_version < 15:
+                    print(f"警告: 检测到Node.js版本 {node_version} 过低，可能导致兼容性问题")
+                    print("建议更新至Node.js 15.0.0或更高版本: https://nodejs.org/")
+                    return True, node_version, npm_version, False  # 返回额外的标志表示版本太低
+                
+                return True, node_version, npm_version, True  # 版本满足要求
+            except (ValueError, IndexError):
+                print(f"警告: 无法解析Node.js版本号: {node_version}")
+                return True, node_version, npm_version, True  # 假设版本没问题
         
         if node_result.returncode != 0:
             print("警告: 未检测到Node.js")
         if npm_result.returncode != 0:
             print("警告: 未检测到npm")
         
-        return False, None, None
+        return False, None, None, False
     except Exception as e:
         print(f"检测Node.js环境时出错: {str(e)}")
-        return False, None, None
+        return False, None, None, False
 
 def check_package_installed(env, package):
     """检查指定环境中是否已安装某个包"""
@@ -213,23 +235,31 @@ def install_requirements(requirements_file):
         print(f"依赖安装失败: {str(e)}")
         print("请尝试手动安装依赖")
 
-def install_frontend_dependencies():
+def install_frontend_dependencies(use_compat_mode=False):
     """安装前端依赖"""
     frontend_dir = Path("frontend")
     
     print("正在安装前端依赖...")
     try:
         # 在Windows上使用shell=True更可靠
-        if sys.platform == "win32":
-            install_cmd = f"cd {frontend_dir} && npm install"
+        if use_compat_mode:
+            print("使用兼容模式安装前端依赖...")
+            if sys.platform == "win32":
+                install_cmd = f"cd {frontend_dir} && npm run compat-install"
+            else:
+                install_cmd = f"cd {frontend_dir} && npm run compat-install"
         else:
-            install_cmd = f"cd {frontend_dir} && npm install"
+            if sys.platform == "win32":
+                install_cmd = f"cd {frontend_dir} && npm install"
+            else:
+                install_cmd = f"cd {frontend_dir} && npm install"
         
         subprocess.run(install_cmd, shell=True, check=True)
         
         # 确保vite已安装
         print("检查Vite是否已安装...")
-        if not (frontend_dir / "node_modules" / ".vite").exists():
+        vite_config_file = frontend_dir / "vite.config.js"
+        if not (frontend_dir / "node_modules" / ".vite").exists() and vite_config_file.exists():
             print("Vite未安装或不完整，尝试单独安装...")
             vite_install_cmd = f"cd {frontend_dir} && npm install vite@latest --save-dev"
             subprocess.run(vite_install_cmd, shell=True, check=True)
@@ -280,12 +310,39 @@ def start_frontend():
     package_json = frontend_dir / "package.json"
     node_modules = frontend_dir / "node_modules"
     
-    if not node_modules.exists():
-        print("警告: 前端依赖可能尚未安装")
-        # 尝试安装，即使检测到没有Node.js也尝试
-        success = install_frontend_dependencies()
-        if not success:
-            print("前端依赖安装失败，请手动运行 'cd frontend && npm install && npm run dev'")
+    # 重新检查Node.js版本
+    has_node, node_version, npm_version, version_ok = check_node_environment()
+    use_compat_mode = has_node and not version_ok
+    
+    if use_compat_mode:
+        print("="*60)
+        print("检测到Node.js版本过低，自动启用兼容模式")
+        print("当前Node.js版本:", node_version)
+        print("本应用已配置为支持较低版本Node.js")
+        print("="*60)
+    
+    if not node_modules.exists() or use_compat_mode:
+        if use_compat_mode:
+            print("正在使用兼容模式重新安装前端依赖...")
+            # 使用兼容模式安装命令
+            if sys.platform == "win32":
+                install_cmd = f"cd {frontend_dir} && npm run compat-install"
+            else:
+                install_cmd = f"cd {frontend_dir} && npm run compat-install"
+        else:
+            print("警告: 前端依赖可能尚未安装")
+            # 使用标准模式安装命令
+            if sys.platform == "win32":
+                install_cmd = f"cd {frontend_dir} && npm install"
+            else:
+                install_cmd = f"cd {frontend_dir} && npm install"
+        
+        try:
+            subprocess.run(install_cmd, shell=True, check=True)
+            print("前端依赖安装完成")
+        except subprocess.CalledProcessError as e:
+            print(f"前端依赖安装失败: {str(e)}")
+            print("请手动运行 'cd frontend && npm install && npm run dev'")
             print("可能需要先安装Node.js: https://nodejs.org/")
             return False
     
@@ -375,7 +432,7 @@ def main():
     # 获取conda环境列表
     conda_envs = get_conda_envs()
     # 检查Node.js环境
-    has_node, node_version, npm_version = check_node_environment()
+    has_node, node_version, npm_version, node_version_ok = check_node_environment()
     
     # 2. 尝试加载保存的配置
     config = load_config()
@@ -519,8 +576,18 @@ def main():
     # 先检查并准备前端环境
     frontend_dir = Path("frontend")
     node_modules = frontend_dir / "node_modules"
-    if not node_modules.exists() or not (frontend_dir / "node_modules" / ".vite").exists():
-        print("前端依赖需要安装...")
+    
+    # 初始化frontend_thread为None
+    frontend_thread = None
+    
+    # 检查Node.js版本是否过低
+    use_compat_mode = has_node and not node_version_ok
+    
+    if not node_modules.exists() or use_compat_mode:
+        if use_compat_mode:
+            print("\n检测到Node.js版本较低，需要使用兼容模式...")
+        else:
+            print("\n前端依赖需要安装...")
         
         # 即使Node.js检测失败，也尝试直接运行npm命令
         # 因为Windows上的PATH环境变量检测可能存在问题
@@ -529,15 +596,24 @@ def main():
         
         install_frontend = input("是否安装前端依赖? (y/n): ").lower()
         if install_frontend == 'y':
-            if not install_frontend_dependencies():
+            # 直接使用start_frontend函数，它已经包含了兼容性处理逻辑
+            if not start_frontend():
                 print("前端依赖安装失败，应用可能无法正常运行")
                 proceed = input("是否继续尝试启动? (y/n): ").lower()
                 if proceed != 'y':
                     return
+            
+            # 安装成功后终止frontend_thread，因为start_frontend已经执行了一次
+            frontend_thread = None
+        else:
+            print("跳过前端依赖安装，应用可能无法正常运行")
     
     # 4. 启动前端和后端
     backend_thread = threading.Thread(target=start_backend, args=(selected_env,), daemon=True)
-    frontend_thread = threading.Thread(target=start_frontend, daemon=True)
+    
+    # 如果没有初始化frontend_thread，创建一个新的
+    if frontend_thread is None:
+        frontend_thread = threading.Thread(target=start_frontend, daemon=True)
     
     # 定义前端URL - 这里假设前端运行在固定端口
     frontend_url = "http://localhost:5173"

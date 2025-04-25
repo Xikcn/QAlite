@@ -65,12 +65,18 @@ async function createFile(fileData) {
   error.value = ''; // 清除之前的错误
   
   try {
+    // 添加一个空的问答卡片
+    const fileDataWithEmptyQA = {
+      ...fileData,
+      qa_pairs: [{ question: '', answer: '' }]
+    };
+    
     const response = await fetch(`${API_URL}/files`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(fileData),
+      body: JSON.stringify(fileDataWithEmptyQA),
     });
     
     if (!response.ok) {
