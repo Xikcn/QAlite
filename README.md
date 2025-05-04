@@ -63,6 +63,71 @@
 3. 启动服务: `npm run dev`
 4. 前端将在 http://localhost:5173 启动
 
+# QAlite Docker 部署指南
+
+## 部署步骤
+
+1. 确保安装了 Docker 和 Docker Compose
+
+2. 在项目根目录下运行以下命令启动服务：
+
+```bash
+docker-compose up -d
+```
+
+3. 等待容器构建和启动完成（首次启动可能需要几分钟）
+
+4. 服务启动后，可以通过以下地址访问：
+   - 前端：http://localhost:5173
+   - 后端API：http://localhost:8000
+
+## 查看日志
+
+如果需要查看服务日志，可以运行：
+
+```bash
+# 查看所有服务日志
+docker-compose logs
+
+# 查看前端日志
+docker-compose logs frontend
+
+# 查看后端日志
+docker-compose logs backend
+
+# 实时查看日志
+docker-compose logs -f
+```
+
+## 停止服务
+
+停止服务但不删除容器：
+
+```bash
+docker-compose stop
+```
+
+停止服务并删除容器：
+
+```bash
+docker-compose down
+```
+
+停止服务并删除容器和数据卷（将删除所有QA数据！）：
+
+```bash
+docker-compose down -v
+```
+
+## 注意事项
+
+1. 所有QA数据保存在Docker数据卷中，重启容器不会丢失数据
+2. 如果修改了代码，需要重新构建容器：
+
+```bash
+docker-compose up -d --build
+``` 
+
 ## 文件存储
 
 所有的问答笔记以Markdown格式存储在 `backend/qa_files` 目录中，您可以直接使用文本编辑器或Markdown编辑器打开这些文件进行查看和编辑。
