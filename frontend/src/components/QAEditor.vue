@@ -51,6 +51,10 @@ const revisionIndex = ref(0);
 const revisionOrder = ref([]);
 const userAnswers = ref([]);
 
+// 弹窗相关状态
+const showDialog = ref(false);
+const dialogQA = ref({ question: '', answer: '' });
+
 // 从本地存储加载设置
 function loadSettings() {
   const savedIndex = localStorage.getItem(CURRENT_INDEX_KEY);
@@ -289,6 +293,7 @@ async function saveChanges() {
 
 // 选择卡片
 function selectCard(index) {
+  if (showDialog.value) return;
   if (!isAnimating.value && index !== currentIndex.value) {
     // 保存当前卡片的内容
     saveChanges();
@@ -313,19 +318,16 @@ function toggleViewMode() {
 
 // 导航到指定索引
 function navigateTo(index) {
+  if (showDialog.value) return;
   if (isAnimating.value) return;
-  
   if (index >= 0 && index < localQaPairs.value.length && index !== currentIndex.value) {
     // 保存当前卡片的内容
     if (hasUnsavedChanges.value) {
       saveChanges();
     }
-    
     isAnimating.value = true;
     currentIndex.value = index;
     saveSettings();
-    
-    // 动画完成后重置状态，减少动画时间
     setTimeout(() => {
       isAnimating.value = false;
     }, 300); // 从400ms减少到300ms
@@ -334,11 +336,11 @@ function navigateTo(index) {
 
 // 导航到相对位置
 async function navigateRelative(direction) {
+  if (showDialog.value) return;
   // 首先保存当前内容
   if (hasUnsavedChanges.value) {
     await saveChanges();
   }
-  
   if (direction === 'prev' && currentIndex.value > 0) {
     navigateTo(currentIndex.value - 1);
   } else if (direction === 'next' && currentIndex.value < localQaPairs.value.length - 1) {
@@ -352,8 +354,6 @@ async function navigateRelative(direction) {
       await addNewQA(); // 使用优化后的addNewQA函数
     }
   }
-  
-  // 等待视图更新后，尝试聚焦到合适的输入框
   setTimeout(() => {
     const newQuestionInput = document.querySelector('.current .question-card textarea');
     if (newQuestionInput) {
@@ -364,12 +364,11 @@ async function navigateRelative(direction) {
 
 // 处理鼠标滚轮事件
 async function handleWheel(event) {
+  if (showDialog.value) return;
   // 阻止默认行为，避免页面滚动
   event.preventDefault();
-  
   // 如果正在动画中，不进行处理
   if (isAnimating.value) return;
-  
   // 如果有未保存的更改，先保存
   if (hasUnsavedChanges.value) {
     await saveChanges();
@@ -428,8 +427,8 @@ function handleTouchMove(event) {
 }
 
 async function handleTouchEnd(event) {
+  if (showDialog.value) return;
   if (isAnimating.value) return;
-  
   touchEndY = event.changedTouches[0].clientY;
   const diffY = touchStartY - touchEndY;
   
@@ -717,10 +716,33 @@ const currentRevisionQA = computed(() => {
   }
   return { question: '', answer: '', userAnswer: '' };
 });
+
+function openDialog(qa) {
+  dialogQA.value = { ...qa };
+  showDialog.value = true;
+}
+
+function closeDialog() {
+  showDialog.value = false;
+}
 </script>
 
 <template>
   <div class="qa-editor" ref="editorContainer">
+    <!-- 弹窗预览 -->
+    <div v-if="showDialog" class="qa-dialog-mask" @click.self="closeDialog">
+      <div class="qa-dialog" @wheel.stop>
+        <button class="dialog-close" @click="closeDialog">×</button>
+        <div class="dialog-section">
+          <div class="dialog-label">问题：</div>
+          <div class="dialog-content" v-html="dialogQA.question.replaceAll('<br>', '\n')"></div>
+        </div>
+        <div class="dialog-section">
+          <div class="dialog-label">回答：</div>
+          <div class="dialog-content" v-html="dialogQA.answer.replaceAll('<br>', '\n')"></div>
+        </div>
+      </div>
+    </div>
     <div class="editor-header">
       <div class="editor-title">Q&A 编辑器</div>
       <div class="editor-actions">
@@ -806,7 +828,7 @@ const currentRevisionQA = computed(() => {
         <div class="card-pair" v-for="(qa, index) in localQaPairs" :key="`pair-${index}`"
              :class="{ 'current': index === currentIndex, 'next': index === currentIndex + 1, 'prev': index === currentIndex - 1 }"
              v-show="index >= currentIndex - 1 && index <= currentIndex + 1"
-             @click="selectCard(index)">
+             @click="selectCard(index)" @dblclick="openDialog(qa)">
           
           <!-- 问题卡片 -->
           <div class="card question-card">
@@ -851,7 +873,7 @@ const currentRevisionQA = computed(() => {
                 class="card combined-card" 
                 :class="{ 'current': index === currentIndex, 'next': index === currentIndex + 1, 'prev': index === currentIndex - 1 }"
                 v-show="index >= currentIndex - 1 && index <= currentIndex + 1"
-                @click="selectCard(index)">
+                @click="selectCard(index)" @dblclick="openDialog(qa)">
               <div class="card-content">
                 <div class="qa-section question-section">
                   <div class="section-header">问题 <span class="card-emoji">❓</span></div>
@@ -1624,6 +1646,69 @@ textarea:disabled {
   }
   50% {
     opacity: 1;
+  }
+}
+
+/* 弹窗遮罩和内容样式 */
+.qa-dialog-mask {
+  position: absolute;
+  z-index: 100;
+  left: 0; top: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.qa-dialog {
+  background: #fff;
+  border-radius: 16px;
+  max-width: 600px;
+  width: 90vw;
+  max-height: 70vh;
+  min-width: 320px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  padding: 2rem 1.5rem 1.5rem 1.5rem;
+  position: relative;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+.dialog-close {
+  position: absolute;
+  right: 1.2rem;
+  top: 1.2rem;
+  background: none;
+  border: none;
+  font-size: 2rem;
+  color: #888;
+  cursor: pointer;
+  z-index: 2;
+}
+.dialog-section {
+  margin-bottom: 0.5rem;
+}
+.dialog-label {
+  font-weight: bold;
+  color: #6d28d9;
+  margin-bottom: 0.3rem;
+}
+.dialog-content {
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 1.1rem;
+  color: #222;
+  background: #f3e8ff;
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+  max-height: 30vh;
+  overflow-y: auto;
+}
+@media (max-width: 700px) {
+  .qa-dialog {
+    max-width: 98vw;
+    min-width: 0;
+    padding: 1rem 0.5rem 0.5rem 0.5rem;
   }
 }
 </style> 
