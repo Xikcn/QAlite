@@ -12,6 +12,7 @@
 ## 扩展展示
 ![mcp.png](mdimg/mcp.png)
 ### 项目演示
+https://github.com/user-attachments/assets/3042252c-5de9-4b44-9d74-fc8c3d06c861
 
 ### 扩展mcp服务使用说明
 1. 运行mcp使用sse模式
