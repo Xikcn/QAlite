@@ -160,7 +160,7 @@ def safe_text(text):
 @mcp.tool()
 async def import_md_to_chroma(md_path: str) -> str:
     """
-    解析指定md文件并将所有问答对存入Chroma数据库
+    处理指定md文件并将所有问答对存入Chroma数据库
     Args:
         md_path: 需要导入的Markdown文件路径
     Returns:
@@ -227,7 +227,7 @@ async def rag_qa(query: str, md_file: str = None, top_k: int = 3) -> str:
 
 
 @mcp.tool()
-async def preview_modify(qa_id: str, new_question: str = None, new_answer: str = None) -> str:
+async def preview_modify(qa_id: str, new_question: str = None, new_answer: str = None) -> dict:
     """
     预览修改某对QA内容，返回修改前后的对比信息
     Args:
@@ -239,12 +239,19 @@ async def preview_modify(qa_id: str, new_question: str = None, new_answer: str =
     """
     preview = preview_modify_qa(qa_id, new_question, new_answer)
     if not preview:
-        return "未找到该QA。"
-    return (f"原问题：{preview['old_question']}\n"
-            f"原答案：{preview['old_answer']}\n"
-            f"新问题：{preview['new_question']}\n"
-            f"新答案：{preview['new_answer']}\n"
-            "如果你觉得可以请回复，允许这样修改；")
+        return {"error": "未找到该QA。"}
+    tips = []
+    if not preview['old_answer'] and preview['new_answer']:
+        tips.append("该问答原本缺失答案，确认后将补全。")
+    if not preview['old_question'] and preview['new_question']:
+        tips.append("该问答原本缺失问题，确认后将补全。")
+    return {
+        "old_question": preview['old_question'],
+        "old_answer": preview['old_answer'],
+        "new_question": preview['new_question'],
+        "new_answer": preview['new_answer'],
+        "tip": " ".join(tips) or "如果你觉得可以请回复，允许这样修改；"
+    }
 
 
 @mcp.tool()
@@ -348,31 +355,6 @@ async def list_qa_pairs(md_file: str = None, page: int = 1, page_size: int = 10)
         "page_size": page_size,
         "data": output
     }, ensure_ascii=False, indent=2)
-
-
-@mcp.tool()
-async def add_qa_pair(question: str, answer: str, md_file: str = "manual") -> str:
-    """
-    手动添加一条问答对到数据库，可指定来源md文件名
-    Args:
-        question: 问题内容
-        answer: 答案内容
-        md_file: 关联的md文件名（可选，默认manual）
-    Returns:
-        添加结果的提示信息，包含新QA的id
-    """
-    if not question or not answer:
-        return "问题和答案不能为空。"
-    qa_id = str(uuid4())
-    question = safe_text(question)
-    answer = safe_text(answer)
-    qa_collection.upsert(
-        ids=[qa_id],
-        documents=[question + '\n' + answer],
-        embeddings=embedding_function([question + '\n' + answer]),
-        metadatas=[{'question': question, 'answer': answer, 'md_file': md_file}]
-    )
-    return f"已添加QA，id: {qa_id}，问题：{question}，答案：{answer}，文件：{md_file}"
 
 
 @mcp.tool()
@@ -481,6 +463,36 @@ def create_starlette_app(mcp_server: Server, *, debug: bool = False) -> Starlett
         ],
     )
 
+
+@mcp.tool()
+async def list_incomplete_qa(md_file: str = None) -> dict:
+    """
+    查询数据库中缺失问题或答案的QA对，支持可选md_file筛选
+    Args:
+        md_file: 需要筛选的md文件名（可选）
+    Returns:
+        包含所有缺失问题或答案的QA对列表（含id、问题、答案、md_file）
+    """
+    where = None
+    if md_file:
+        filename = os.path.basename(md_file)
+        filename = os.path.splitext(filename)[0]
+        where = {"md_file": filename}
+    results = qa_collection.get(where=where, include=["metadatas"])
+    ids = results.get("ids", [])
+    metadatas = results.get("metadatas", [])
+    incomplete = []
+    for qa_id, meta in zip(ids, metadatas):
+        q = meta.get('question', '').strip()
+        a = meta.get('answer', '').strip()
+        if not q or not a:
+            incomplete.append({
+                "id": qa_id,
+                "问题": q,
+                "答案": a,
+                "md_file": meta.get('md_file', '未知')
+            })
+    return {"count": len(incomplete), "data": incomplete}
 
 
 if __name__ == "__main__":
